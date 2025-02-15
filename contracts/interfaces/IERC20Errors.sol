@@ -15,6 +15,8 @@ interface IERC20Errors {
      */
     error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed);
 
+    error ERC20ZeroAddress();
+
     /**
      * @dev Indicates a failure with the token `sender`. Used in transfers.
      * @param sender Address whose tokens are being transferred.

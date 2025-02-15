@@ -9,10 +9,11 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC721Errors} from "../interfaces/IERC721Errors.sol";
-// import "../components/Context.sol";
+import {ILFGCollection} from "../interfaces/ILFGCollection.sol";
+import {IGovernance} from "../interfaces/IGovernance.sol";
 import "./LFGToken.sol";
 
-contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metadata {
+contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metadata, ILFGCollection {
     using Strings for uint256;
 
     // Token name
@@ -23,11 +24,13 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
     uint256 public ID;
     uint256 public MaxCollectionSupply;
 
-    constructor(address _owner, string memory name_, string memory symbol_) Ownable(_owner) {
+    address private governance;
+
+    constructor(address _owner, address _governance, string memory name_, string memory symbol_) Ownable(_owner) {
+        governance = _governance;
         _name = name_;
         _symbol = symbol_;
     }
-
 
     mapping(uint256 => address) private _owners;
 
@@ -37,18 +40,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
 
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
-    // Optional mapping for token URIs
-    mapping(uint256 tokenId => string) private _tokenURIs;
-
-    struct TokenInfo {
-        address tokenAddress;
-        string content;
-        address author;
-    }
-
-    mapping(uint256 => TokenInfo) public IDToTokenInfo;
-
-    event MetadataUpdate(uint256 indexed tokenId);
+    mapping(uint256 => TokenInfo) private idToTokenInfo; 
 
     /**
      * @dev See {IERC165-supportsInterface}.
@@ -56,7 +48,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
     function supportsInterface(bytes4 interfaceId) public view override(ERC165, IERC165) returns (bool) {
         return
             interfaceId == type(IERC721).interfaceId ||
-            interfaceId == type(IERC721Metadata).interfaceId ||
+            interfaceId == type(IERC721Metadata).interfaceId || 
             super.supportsInterface(interfaceId);
     }
    
@@ -65,37 +57,54 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
         uint256 _lfgMaxSupply,
         string memory _tokenName,
         string memory _tokenSymbol,
-        string memory _content
-    ) external onlyOwner {
+        string memory _content,
+        string memory _tokenURI
+    ) external payable onlyOwner {
         address sender = _msgSender();
+        uint64 fee = IGovernance(governance).getFeeInfo().fee;
+        address feeReceiver = IGovernance(governance).getFeeInfo().receiver;
+        require(msg.value >= fee, "Insufficient fee");
         address newLFGToken = address(
             new LFGToken{
                 salt: keccak256(
                     abi.encodePacked(ID, _tokenSymbol, sender)
                 )
-            }(_tokenName, _tokenSymbol, _tokenDecimals, _lfgMaxSupply)
+            }(ID)
         );
-        require(newLFGToken != address(0), "Failed to create LFGToken");
-        IDToTokenInfo[ID] = TokenInfo({
-            tokenAddress: newLFGToken,
+        require(newLFGToken != address(0));
+        idToTokenInfo[ID] = TokenInfo({
+            decimals: _tokenDecimals,
+            createTime: uint64(block.timestamp),
+            nftId: ID,
+            maxSupply: _lfgMaxSupply,
+            tokenName: _tokenName,
+            tokenSymbol: _tokenSymbol,
             content: _content,
+            tokenURI: _tokenURI,
+            tokenAddress: newLFGToken,
             author: sender
         });
         _safeMint(sender, ID);
         ID++;
+        (bool success, ) = payable(feeReceiver).call{value: fee}("");
+        require(success);
     }
 
-    function updateTokenURI(uint256 tokenId, string memory _tokenURI) external onlyOwner {
-        _tokenURIs[tokenId] = _tokenURI;
+    function updateTokenURI(uint256 tokenId, string memory _tokenURI) external {
+        _requireOwned(tokenId);
+        idToTokenInfo[tokenId].tokenURI = _tokenURI;
+        _metadataUpdateEvent(tokenId);
+    }
+
+    function updateTokenContent(uint256 tokenId, string memory _content) external {
+        _requireOwned(tokenId);
+        idToTokenInfo[tokenId].content = _content;
     }
 
     /**
      * @dev See {IERC721-balanceOf}.
      */
     function balanceOf(address owner) public view returns (uint256) {
-        if (owner == address(0)) {
-            revert ERC721InvalidOwner(address(0));
-        }
         return _balances[owner];
     }
 
@@ -123,11 +132,13 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
     /**
      * @dev See {IERC721Metadata-tokenURI}.
      */
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+    function tokenURI(uint256 tokenId) external view returns (string memory thisTokenURI) {
         _requireOwned(tokenId);
+        thisTokenURI = idToTokenInfo[tokenId].tokenURI;
+    }
 
-        string memory _tokenURI = _tokenURIs[tokenId];
-        return _tokenURI;
+    function getTokenInfo(uint256 tokenId) external view returns (TokenInfo memory) {
+        return idToTokenInfo[tokenId];
     }
 
     /**
@@ -136,7 +147,11 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
      * Emits {MetadataUpdate}.
      */
     function _setTokenURI(uint256 tokenId, string memory _tokenURI) internal {
-        _tokenURIs[tokenId] = _tokenURI;
+        idToTokenInfo[tokenId].tokenURI = _tokenURI;
+        _metadataUpdateEvent(tokenId);
+    }
+
+    function _metadataUpdateEvent(uint256 tokenId) private {
         emit MetadataUpdate(tokenId);
     }
 
@@ -174,9 +189,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
      * @dev See {IERC721-transferFrom}.
      */
     function transferFrom(address from, address to, uint256 tokenId) public {
-        if (to == address(0)) {
-            revert ERC721InvalidReceiver(address(0));
-        }
+        require(to != address(0));
         // Setting an "auth" arguments enables the `_isAuthorized` check which verifies that the token exists
         // (from != 0). Therefore, it is not needed to verify that the return value is not 0 here.
         address previousOwner = _update(to, tokenId, _msgSender());
@@ -303,7 +316,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
         }
 
         _owners[tokenId] = to;
-
+        idToTokenInfo[tokenId].author = to;
         emit Transfer(from, to, tokenId);
 
         return from;

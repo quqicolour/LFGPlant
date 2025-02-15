@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-contract Governance {
+import {IGovernance} from "../interfaces/IGovernance.sol";
+
+contract Governance is IGovernance{
     address public owner;
     address public manager;
     address private feeReceiver;
-    uint8 public fee;
-    uint8 public createFee;
+    uint64 public fee;
 
-    constructor(address _owner, address _manager, address _feeReceiver, uint8 _fee) {
+    mapping(address => FeeInfo) private feeInfo;
+
+    constructor(address _owner, address _manager, address _feeReceiver, uint64 _fee) {
         owner = _owner;
         manager = _manager;
-        feeReceiver = _feeReceiver;
-        fee = _fee;
+        feeInfo[address(this)] = FeeInfo({
+            fee: _fee,
+            receiver: _feeReceiver
+        });
     }
 
     modifier onlyOwner() {
@@ -35,24 +40,15 @@ contract Governance {
         manager = _manager;
     }
 
-    function setFeeReceiver(address _feeReceiver) public onlyOwner {
-        feeReceiver = _feeReceiver;
+    function setFeeInfo(address _newFeeReceiver, uint64 _newFee) public onlyOwner {
+        feeInfo[address(this)] = FeeInfo({
+            fee: _newFee,
+            receiver: _newFeeReceiver
+        });
     }
 
-    function setFee(uint8 _fee) public onlyOwner {
-        fee = _fee;
-    }
-
-    function setCreateFee(uint8 _createFee) public onlyManager {
-        createFee = _createFee;
-    }
-
-    function getFeeReceiver() public view returns (address _feeReceiver) {
-        if(feeReceiver == address(0)) {
-            _feeReceiver = address(this);
-        } else {
-            _feeReceiver = feeReceiver;
-        }
+    function getFeeInfo() public view returns (FeeInfo memory) {
+        return feeInfo[address(this)];
     }
 
     function withdraw() public onlyOwner {

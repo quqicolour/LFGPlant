@@ -6,7 +6,7 @@ import {LFGCollection} from "./LFGCollection.sol";
 contract LFGFactory {
 
     uint64 public CollectionId;
-    address public Governance;   
+    address private Governance;   
 
     constructor(address _Governance) {
         Governance = _Governance;
@@ -16,12 +16,14 @@ contract LFGFactory {
         uint64 CollectionId;
         address CollectionAddress;
         uint64 createTime;
-        address author;
+        address creator;
     }
 
     mapping(address => mapping(uint32 => CollectionInfo[])) public UserCollectionInfo;
 
     mapping(address => uint32) public UserCollectionCount;
+
+    mapping(uint64 => address) public IdToCollection;
 
     event CollectionCreated(address indexed author, uint64 indexed collectionId, address indexed collectionAddress);
 
@@ -33,12 +35,13 @@ contract LFGFactory {
                 )
             }(msg.sender, Governance, name, symbol)
         );
+        IdToCollection[CollectionId] = collection;
         UserCollectionInfo[msg.sender][UserCollectionCount[msg.sender]].push(
             CollectionInfo({
                 CollectionId: CollectionId,
                 CollectionAddress: collection,
                 createTime: uint64(block.timestamp),
-                author: msg.sender
+                creator: msg.sender
             })
         );
         if(UserCollectionInfo[msg.sender][UserCollectionCount[msg.sender]].length >= 9){
@@ -46,6 +49,6 @@ contract LFGFactory {
         }
         emit CollectionCreated(msg.sender, CollectionId, collection);
         CollectionId++;
-        require(collection != address(0), "Failed to create collection");
+        require(collection != address(0));
     }
 }

@@ -8,6 +8,14 @@ pragma solidity ^0.8.20;
  */
 interface IERC721Errors {
     /**
+     * @dev Check msg.value >= fee
+     * Used in balance queries.
+     * @param value msg.value
+     * @param fee fee
+     */
+    error InsufficientFee(uint256 value, uint64 fee);
+
+    /**
      * @dev Indicates that an address can't be an owner. For example, `address(0)` is a forbidden owner in ERC-20.
      * Used in balance queries.
      * @param owner Address of the current owner of a token.

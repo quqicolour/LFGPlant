@@ -87,8 +87,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
     }
 
     function burn(uint256 amount) public returns (bool _state){
-        address owner = _msgSender();
-        _burn(owner, amount);
+        _burn(_msgSender(), amount);
         _state = true;
     }
 
@@ -101,8 +100,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
      * - the caller must have a balance of at least `value`.
      */
     function transfer(address to, uint256 value) public returns (bool) {
-        address owner = _msgSender();
-        _transfer(owner, to, value);
+        _transfer(_msgSender(), to, value);
         return true;
     }
 
@@ -130,8 +128,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
         address spender,
         uint256 value
     ) public returns (bool) {
-        address owner = _msgSender();
-        _approve(owner, spender, value);
+        _approve(_msgSender(), spender, value);
         return true;
     }
 
@@ -173,9 +170,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
      * NOTE: This function is not virtual, {_update} should be overridden instead.
      */
     function _transfer(address from, address to, uint256 value) internal {
-        if (from == address(0) || to == address(0)) {
-            revert ERC20ZeroAddress();
-        }
+        require(from != address(0) && to != address(0));
         _update(from, to, value);
     }
 
@@ -188,7 +183,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
      */
     function _update(address from, address to, uint256 value) internal {
         if (from == address(0)) {
-            require(_totalSupply + value <= _getTokenInfo().maxSupply, "Max supply exceeded");
+            require(_totalSupply + value <= _getTokenInfo().maxSupply);
             _totalSupply += value;
         } else {
             uint256 fromBalance = _balances[from];
@@ -223,9 +218,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
      * NOTE: This function is not virtual, {_update} should be overridden instead.
      */
     function _mint(address account, uint256 value) internal {
-        if (account == address(0)) {
-            revert ERC20ZeroAddress();
-        }
+        require(account != address(0));
         _update(address(0), account, value);
     }
 
@@ -238,9 +231,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
      * NOTE: This function is not virtual, {_update} should be overridden instead
      */
     function _burn(address account, uint256 value) internal {
-        if (account == address(0)) {
-            revert ERC20ZeroAddress();
-        }
+        require(account != address(0));
         _update(account, address(0), value);
     }
 
@@ -287,9 +278,7 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
         uint256 value,
         bool emitEvent
     ) internal {
-        if (owner == address(0) || spender == address(0)) {
-            revert ERC20ZeroAddress();
-        }   
+        require(owner != address(0) && spender != address(0));
         _allowances[owner][spender] = value;
         if (emitEvent) {
             emit Approval(owner, spender, value);
@@ -324,8 +313,8 @@ contract LFGToken is IERC20, Context, IERC20Metadata, IERC20Errors {
         }
     }
 
-    function _getTokenInfo() internal view returns (ILFGCollection.TokenInfo memory) {
-        return ILFGCollection(caller).getTokenInfo(nftId);
+    function _getTokenInfo() private view returns (ILFGCollection.TokenInfo memory _thisTokenInfo) {
+        _thisTokenInfo = ILFGCollection(caller).getTokenInfo(nftId);
     }
 
 }

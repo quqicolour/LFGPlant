@@ -5,16 +5,15 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Ownable, Context} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import {ERC721Utils} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC721Errors} from "../interfaces/IERC721Errors.sol";
 import {ILFGCollection} from "../interfaces/ILFGCollection.sol";
 import {IGovernance} from "../interfaces/IGovernance.sol";
+import {ILFGToken} from "../interfaces/ILFGToken.sol";
 import "./LFGToken.sol";
 
 contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metadata, ILFGCollection {
-    using Strings for uint256;
 
     // Token name
     string private _name;
@@ -51,6 +50,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
             interfaceId == type(IERC721Metadata).interfaceId || 
             super.supportsInterface(interfaceId);
     }
+
    
     function create(
         uint8 _tokenDecimals,
@@ -63,7 +63,9 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
         address sender = _msgSender();
         uint64 fee = IGovernance(governance).getFeeInfo().fee;
         address feeReceiver = IGovernance(governance).getFeeInfo().receiver;
-        require(msg.value >= fee, "Insufficient fee");
+        if(msg.value < fee){
+            revert InsufficientFee(msg.value, fee);
+        }
         address newLFGToken = address(
             new LFGToken{
                 salt: keccak256(
@@ -71,7 +73,6 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
                 )
             }(ID)
         );
-        require(newLFGToken != address(0));
         idToTokenInfo[ID] = TokenInfo({
             decimals: _tokenDecimals,
             createTime: uint64(block.timestamp),
@@ -335,13 +336,9 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
      * Emits a {Transfer} event.
      */
     function _mint(address to, uint256 tokenId) internal {
-        if (to == address(0)) {
-            revert ERC721InvalidReceiver(address(0));
-        }
+        require(to != address(0));
         address previousOwner = _update(to, tokenId, address(0));
-        if (previousOwner != address(0)) {
-            revert ERC721InvalidSender(address(0));
-        }
+        require(previousOwner == address(0));
     }
 
     /**
@@ -380,9 +377,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
      */
     function _burn(uint256 tokenId) internal {
         address previousOwner = _update(address(0), tokenId, address(0));
-        if (previousOwner == address(0)) {
-            revert ERC721NonexistentToken(tokenId);
-        }
+        require(previousOwner != address(0));
     }
 
     /**
@@ -397,9 +392,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
      * Emits a {Transfer} event.
      */
     function _transfer(address from, address to, uint256 tokenId) internal {
-        if (to == address(0)) {
-            revert ERC721InvalidReceiver(address(0));
-        }
+        require(to != address(0));
         address previousOwner = _update(to, tokenId, address(0));
         if (previousOwner == address(0)) {
             revert ERC721NonexistentToken(tokenId);
@@ -485,9 +478,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
      * Emits an {ApprovalForAll} event.
      */
     function _setApprovalForAll(address owner, address operator, bool approved) internal {
-        if (operator == address(0)) {
-            revert ERC721InvalidOperator(operator);
-        }
+        require(operator != address(0));
         _operatorApprovals[owner][operator] = approved;
         emit ApprovalForAll(owner, operator, approved);
     }
@@ -500,9 +491,7 @@ contract LFGCollection is Ownable, ERC165, IERC721, IERC721Errors, IERC721Metada
      */
     function _requireOwned(uint256 tokenId) internal view returns (address) {
         address owner = _ownerOf(tokenId);
-        if (owner == address(0)) {
-            revert ERC721NonexistentToken(tokenId);
-        }
+        require(owner != address(0));
         return owner;
     }
 

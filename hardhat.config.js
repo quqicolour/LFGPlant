@@ -5,6 +5,10 @@ require('dotenv').config();
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   networks:{
+    monad: {
+      url: process.env.MONAD_TESTNET_URL,
+      accounts: [process.env.PRIVATE_KEY1, process.env.PRIVATE_KEY2]
+    },
     sonic: {
       url: process.env.SONIC_TESTNET_URL,
       accounts: [process.env.PRIVATE_KEY1, process.env.PRIVATE_KEY2]
@@ -28,8 +32,15 @@ module.exports = {
     outputFile: 'gas-report.txt', 
     noColors: true 
   },
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://sourcify-api-monad.blockvision.org",
+    browserUrl: "https://testnet.monadexplorer.com",
+    failOnCompilerError: false,
+    validateSourcesOnPush: false
+  },
   etherscan: {
-    apiKey: process.env.ARBscan_Api_Key
+    enabled: false
   },
   paths: {
     sources: "./contracts",

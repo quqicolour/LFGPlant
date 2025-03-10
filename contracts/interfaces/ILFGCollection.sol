@@ -17,7 +17,18 @@ interface ILFGCollection {
 
     event MetadataUpdate(uint256 indexed tokenId);
 
+    function ID() external view returns(uint256);
+
     function getTokenInfo(uint256 tokenId) external view returns (TokenInfo memory);
 
+    function create(
+        uint8 _tokenDecimals,
+        address _creator,
+        uint256 _lfgMaxSupply,
+        string memory _tokenName,
+        string memory _tokenSymbol,
+        string memory _content,
+        string memory _tokenURI
+    ) external;
 }
 
